@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { unlink } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -6,6 +5,7 @@ import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
 import { config } from "../config.js";
+import { deleteImage, uploadImage } from "../lib/cloudinary.js";
 import { HttpError } from "../lib/http.js";
 import { requireAuth } from "../middleware/auth.js";
 import { Destination } from "../models/Destination.js";
@@ -24,12 +24,9 @@ const allowed: Record<string, string> = {
   "image/gif": ".gif",
 };
 
-// Files get a random name so uploads never overwrite each other
+// Files are held in memory just long enough to send them to Cloudinary
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: uploadDir,
-    filename: (_req, file, cb) => cb(null, `${randomUUID()}${allowed[file.mimetype]}`),
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: config.maxUploadBytes, files: 20 },
   fileFilter: (_req, file, cb) => {
     if (allowed[file.mimetype]) cb(null, true);
@@ -44,11 +41,12 @@ mediaRouter.get("/", async (_req, res) => {
 mediaRouter.post("/", upload.array("files"), async (req, res) => {
   const files = (req.files as Express.Multer.File[] | undefined) ?? [];
   if (files.length === 0) throw new HttpError(400, "Choose at least one image");
+  const uploaded = await Promise.all(files.map((file) => uploadImage(file.buffer)));
   const media = await Media.insertMany(
-    files.map((file) => ({
-      filename: file.filename,
+    files.map((file, i) => ({
+      filename: uploaded[i].public_id,
       originalName: file.originalname,
-      url: `/uploads/${file.filename}`,
+      url: uploaded[i].secure_url,
       mimeType: file.mimetype,
       size: file.size,
       alt: path.parse(file.originalname).name.replace(/[-_]+/g, " "),
@@ -92,6 +90,11 @@ mediaRouter.delete("/:id", async (req, res) => {
     return;
   }
   await media.deleteOne();
-  await unlink(path.join(uploadDir, media.filename)).catch(() => {});
+  // Images from before the Cloudinary switch are still local files
+  if (media.url.startsWith("/uploads/")) {
+    await unlink(path.join(uploadDir, media.filename)).catch(() => {});
+  } else {
+    await deleteImage(media.filename).catch((err) => console.error("Cloudinary delete failed", err));
+  }
   res.status(204).end();
 });

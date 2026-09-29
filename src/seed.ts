@@ -1,13 +1,13 @@
 // One-time setup: creates the first admin and copies the website's current
 // destinations and Kerala packages into the database. Safe to re-run; it
 // skips anything that already exists.
-import { copyFile, stat } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { config } from "./config.js";
+import { uploadImage } from "./lib/cloudinary.js";
 import { Admin } from "./models/Admin.js";
 import { Destination } from "./models/Destination.js";
 import { Media } from "./models/Media.js";
@@ -16,20 +16,18 @@ import { Package } from "./models/Package.js";
 import { keralaPackages } from "../../purple-frontend/src/data/kerala.ts";
 
 const frontendImages = fileURLToPath(new URL("../../purple-frontend/public/images/", import.meta.url));
-const uploadDir = fileURLToPath(config.uploadDir);
 
-/** Copies a website image into /uploads and registers it in the media library. */
+/** Uploads a website image to Cloudinary and registers it in the media library. */
 async function importImage(file: string, alt: string): Promise<string> {
   const existing = await Media.findOne({ originalName: file });
   if (existing) return existing.url;
   const source = path.join(frontendImages, file);
   const { size } = await stat(source);
-  const filename = `${randomUUID()}${path.extname(file)}`;
-  await copyFile(source, path.join(uploadDir, filename));
+  const uploaded = await uploadImage(source);
   const media = await Media.create({
-    filename,
+    filename: uploaded.public_id,
     originalName: file,
-    url: `/uploads/${filename}`,
+    url: uploaded.secure_url,
     mimeType: path.extname(file) === ".png" ? "image/png" : "image/jpeg",
     size,
     alt,

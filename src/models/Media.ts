@@ -1,6 +1,7 @@
 import { Schema, model, type InferSchemaType } from "mongoose";
 
-// An uploaded image. The file lives in /uploads; `url` is what pages store.
+// An uploaded image. The file lives on Cloudinary (`filename` is its public id);
+// `url` is what pages store.
 const mediaSchema = new Schema(
   {
     filename: { type: String, required: true, unique: true },

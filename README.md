@@ -39,12 +39,12 @@ from `/api/auth/login`. Adding `?all=1` with a token includes drafts.
 | GET / POST | `/api/media` | ✔ | List / upload images (field `files`, up to 20, 5 MB each) |
 | PATCH / DELETE | `/api/media/:id` | ✔ | Edit alt text / delete (409 if in use; `?force=1` to override) |
 
-Uploaded files are saved in `uploads/` and served at `/uploads/<file>`. The database stores the
-path (`/uploads/…`), so changing the API's domain later doesn't break images.
+Uploaded images are stored on Cloudinary (folder `purple-world`) and the database stores their
+full `https://res.cloudinary.com/…` URL. Images uploaded before the switch lived in `uploads/`;
+`npm run migrate:uploads` moves them to Cloudinary and updates every page that uses them.
 
 ## Before going live
 
 - Set `CORS_ORIGINS` to the real website and admin URLs.
-- Put `uploads/` on persistent storage (or switch to S3/Cloudinary) and back it up with the database.
 - Serve the API over HTTPS.
 "# purpleworld-backend" 
