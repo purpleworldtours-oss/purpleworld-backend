@@ -17,6 +17,13 @@ export const config = {
     apiKey: required("CLOUDINARY_API_KEY"),
     apiSecret: required("CLOUDINARY_API_SECRET"),
   },
+  // Website enquiries are emailed to the team through Resend. Optional at
+  // startup so the rest of the API keeps working, but enquiries fail without it
+  enquiryEmail: {
+    apiKey: process.env.RESEND_API_KEY,
+    to: process.env.ENQUIRY_TO_EMAIL,
+    from: process.env.ENQUIRY_FROM_EMAIL,
+  },
   uploadDir: new URL("../uploads/", import.meta.url),
   maxUploadBytes: 5 * 1024 * 1024,
 };

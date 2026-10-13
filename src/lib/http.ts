@@ -34,6 +34,16 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     res.status(400).json({ error: message });
     return;
   }
+  // Thrown by express.json() for unparseable or oversized bodies
+  const bodyError = (err as { type?: string }).type;
+  if (bodyError === "entity.parse.failed") {
+    res.status(400).json({ error: "Invalid request body" });
+    return;
+  }
+  if (bodyError === "entity.too.large") {
+    res.status(413).json({ error: "Request is too large" });
+    return;
+  }
   if (err instanceof mongoose.Error.CastError) {
     res.status(404).json({ error: "Not found" });
     return;

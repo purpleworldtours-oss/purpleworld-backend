@@ -1,6 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
+import { sendEnquiryEmail } from "../lib/email.js";
 import { HttpError } from "../lib/http.js";
 import { requireAuth } from "../middleware/auth.js";
 import { Enquiry, enquiryStatuses } from "../models/Enquiry.js";
@@ -32,11 +33,18 @@ const submitSchema = z.object({
 });
 
 enquiriesRouter.post("/", submitLimiter, async (req, res) => {
-  const { website, ...data } = submitSchema.parse(req.body);
+  const { website, ...data } = submitSchema.parse(req.body ?? {});
   if (website) {
     // Pretend it worked so bots don't retry
     res.status(201).json({ ok: true });
     return;
+  }
+  // Email first: if it fails nothing is saved, so the visitor can safely retry
+  try {
+    await sendEnquiryEmail(data);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    throw new HttpError(502, "We couldn't send your request right now. Please try again, or call us.");
   }
   await Enquiry.create(data);
   res.status(201).json({ ok: true });
